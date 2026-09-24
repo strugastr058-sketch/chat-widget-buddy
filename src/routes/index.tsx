@@ -70,6 +70,7 @@ function Index() {
             title="Recruiter chat (embedded)"
             greeting="Hi! I'm the demo assistant. Ask me anything."
             storageKey="ai-chat-widget:demo-embedded"
+            initialPrompts={["What is his experience with Java?", "What projects has he shipped?", "Is he open to freelance work?"]}
           />
         </section>
       </main>
