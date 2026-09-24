@@ -1,43 +1,53 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import { MessageCircle, X, Send, Trash2, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Trash2, Loader2, RotateCcw } from "lucide-react";
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  error?: boolean;
 }
 
 export interface AIChatWidgetProps {
-  /** Endpoint that accepts POST { messages: ChatMessage[] } and streams back text (SSE or plain). */
+  /** Endpoint that accepts POST { messages } and streams back text (SSE or plain). */
   apiEndpoint: string;
-  /** "floating" renders a bubble that opens a drawer; "embedded" renders an inline panel. */
   mode?: "floating" | "embedded";
-  /** Title shown in the widget header. */
   title?: string;
-  /** First assistant message shown when history is empty. */
   greeting?: string;
-  /** Input placeholder text. */
   placeholder?: string;
-  /** localStorage key for persisting history. */
+  /** Storage key for persisting history. */
   storageKey?: string;
-  /** Accent color (any CSS color) for the bubble, send button and user messages. */
+  /** Where to persist history. Default "local". */
+  persistence?: "local" | "session" | "none";
+  /** Starter prompt pills shown before the user's first message. Clicking sends it. */
+  initialPrompts?: string[];
+  /** Optional slot rendered under each finished assistant message (e.g. booking link). */
+  renderMessageActions?: (message: ChatMessage) => ReactNode;
+  /** Show the Connecting/Thinking/Streaming badge in the header. Default true. */
+  showStatus?: boolean;
   accentColor?: string;
-  /** Corner position for floating mode. */
   position?: "bottom-right" | "bottom-left";
 }
 
+type Status = "idle" | "submitted" | "streaming";
+
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-function loadMessages(key: string, greeting?: string): ChatMessage[] {
+function getStore(p: AIChatWidgetProps["persistence"]): Storage | null {
+  if (p === "none" || typeof window === "undefined") return null;
+  return p === "session" ? window.sessionStorage : window.localStorage;
+}
+
+function loadMessages(store: Storage | null, key: string, greeting?: string): ChatMessage[] {
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = store?.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as ChatMessage[];
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {
-    /* ignore corrupt storage */
+    /* ignore */
   }
   return greeting ? [{ id: uid(), role: "assistant", content: greeting }] : [];
 }
@@ -47,11 +57,13 @@ async function streamChat(
   messages: ChatMessage[],
   onToken: (full: string) => void,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<string> {
   const res = await fetch(apiEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: messages.map(({ role, content }) => ({ role, content })) }),
+    body: JSON.stringify({
+      messages: messages.filter((m) => !m.error).map(({ role, content }) => ({ role, content })),
+    }),
     signal,
   });
   if (!res.ok || !res.body) throw new Error(`Chat request failed (${res.status})`);
@@ -87,6 +99,7 @@ async function streamChat(
     }
     onToken(full);
   }
+  return full;
 }
 
 function TypingDots() {
@@ -99,6 +112,12 @@ function TypingDots() {
   );
 }
 
+const STATUS_LABEL: Record<Status, string> = {
+  idle: "",
+  submitted: "Thinking…",
+  streaming: "Streaming…",
+};
+
 export function AIChatWidget({
   apiEndpoint,
   mode = "floating",
@@ -106,97 +125,138 @@ export function AIChatWidget({
   greeting = "Hi! How can I help you today?",
   placeholder = "Type a message…",
   storageKey = "ai-chat-widget:messages",
+  persistence = "local",
+  initialPrompts,
+  renderMessageActions,
+  showStatus = true,
   accentColor,
   position = "bottom-right",
 }: AIChatWidgetProps) {
   const [open, setOpen] = useState(mode === "embedded");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitted" | "streaming">("idle");
+  const [status, setStatus] = useState<Status>("idle");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const busy = status !== "idle";
 
-  // Load persisted history once on mount (client-only).
   useEffect(() => {
-    setMessages(loadMessages(storageKey, greeting));
+    setMessages(loadMessages(getStore(persistence), storageKey, greeting));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey]);
+  }, [storageKey, persistence]);
 
-  // Persist on change.
   useEffect(() => {
     if (messages.length === 0) return;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(messages));
+      getStore(persistence)?.setItem(storageKey, JSON.stringify(messages));
     } catch {
-      /* storage full — non-fatal */
+      /* non-fatal */
     }
-  }, [messages, storageKey]);
+  }, [messages, storageKey, persistence]);
 
-  // Auto-scroll to bottom.
+  // Auto-scroll only while the user is near the bottom.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, status, open]);
 
-  // Keep the composer focused.
   useEffect(() => {
     if (open && !busy) inputRef.current?.focus();
   }, [open, busy]);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || busy) return;
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: text };
-    const assistantMsg: ChatMessage = { id: uid(), role: "assistant", content: "" };
-    const next = [...messages, userMsg];
-    setMessages([...next, assistantMsg]);
-    setInput("");
-    setStatus("submitted");
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  };
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    try {
-      await streamChat(
-        apiEndpoint,
-        next,
-        (full) => {
-          setStatus("streaming");
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantMsg.id ? { ...m, content: full } : m)),
-          );
-        },
-        controller.signal,
-      );
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: m.content || "Sorry — something went wrong. Please try again." }
-              : m,
-          ),
+  const run = useCallback(
+    async (history: ChatMessage[]) => {
+      const assistantMsg: ChatMessage = { id: uid(), role: "assistant", content: "" };
+      setMessages([...history, assistantMsg]);
+      setStatus("submitted");
+      stickRef.current = true;
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const full = await streamChat(
+          apiEndpoint,
+          history,
+          (text) => {
+            setStatus("streaming");
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantMsg.id ? { ...m, content: text } : m)),
+            );
+          },
+          controller.signal,
         );
+        if (!full.trim()) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: "The assistant returned an empty response.", error: true }
+                : m,
+            ),
+          );
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsg.id
+                ? {
+                    ...m,
+                    content: m.content || "Couldn't reach the assistant. Check your connection and try again.",
+                    error: true,
+                  }
+                : m,
+            ),
+          );
+        }
+      } finally {
+        setStatus("idle");
+        abortRef.current = null;
       }
-    } finally {
-      setStatus("idle");
-      abortRef.current = null;
-    }
-  }, [apiEndpoint, busy, input, messages]);
+    },
+    [apiEndpoint],
+  );
+
+  const sendText = useCallback(
+    (raw: string) => {
+      const text = raw.trim();
+      if (!text || busy) return;
+      setInput("");
+      void run([...messages, { id: uid(), role: "user", content: text }]);
+    },
+    [busy, messages, run],
+  );
+
+  const retry = useCallback(() => {
+    if (busy) return;
+    // Drop trailing failed assistant message and resend.
+    const idx = messages.length - 1;
+    const history = messages[idx]?.error ? messages.slice(0, idx) : messages;
+    if (history[history.length - 1]?.role !== "user") return;
+    void run(history);
+  }, [busy, messages, run]);
 
   const clear = useCallback(() => {
     abortRef.current?.abort();
     const fresh = greeting ? [{ id: uid(), role: "assistant" as const, content: greeting }] : [];
     setMessages(fresh);
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(fresh));
+      getStore(persistence)?.setItem(storageKey, JSON.stringify(fresh));
     } catch {
       /* ignore */
     }
-  }, [greeting, storageKey]);
+  }, [greeting, storageKey, persistence]);
 
   const style = accentColor ? ({ "--aichat-accent": accentColor } as React.CSSProperties) : undefined;
+  const hasUserMessage = messages.some((m) => m.role === "user");
+  const lastId = messages[messages.length - 1]?.id;
 
   const panel = (
     <div
@@ -206,7 +266,15 @@ export function AIChatWidget({
       aria-label={title}
     >
       <div className="aichat-header">
-        <span className="aichat-title">{title}</span>
+        <div className="aichat-title-wrap">
+          <span className="aichat-title">{title}</span>
+          {showStatus && busy && (
+            <span className="aichat-status" aria-live="polite">
+              <span className="aichat-status-dot" />
+              {STATUS_LABEL[status]}
+            </span>
+          )}
+        </div>
         <div className="aichat-header-actions">
           <button type="button" className="aichat-icon-btn" onClick={clear} aria-label="Clear conversation">
             <Trash2 size={16} />
@@ -219,30 +287,47 @@ export function AIChatWidget({
         </div>
       </div>
 
-      <div className="aichat-messages" ref={scrollRef}>
+      <div className="aichat-messages" ref={scrollRef} onScroll={onScroll}>
         {messages.map((m) => (
-          <div key={m.id} className={`aichat-msg aichat-msg--${m.role}`}>
+          <div key={m.id} className={`aichat-msg aichat-msg--${m.role} ${m.error ? "aichat-msg--error" : ""}`}>
             {m.role === "assistant" ? (
               m.content === "" && busy ? (
                 <TypingDots />
               ) : (
-                <div className="aichat-markdown">
-                  <ReactMarkdown>{m.content}</ReactMarkdown>
-                </div>
+                <>
+                  <div className="aichat-markdown">
+                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                  </div>
+                  {m.error && m.id === lastId && (
+                    <button type="button" className="aichat-retry" onClick={retry} disabled={busy}>
+                      <RotateCcw size={13} /> Retry
+                    </button>
+                  )}
+                  {!m.error && !(busy && m.id === lastId) && renderMessageActions?.(m)}
+                </>
               )
             ) : (
               m.content
             )}
           </div>
         ))}
-        {status === "submitted" && messages[messages.length - 1]?.content !== "" && <TypingDots />}
+
+        {!hasUserMessage && initialPrompts && initialPrompts.length > 0 && (
+          <div className="aichat-prompts">
+            {initialPrompts.map((p) => (
+              <button key={p} type="button" className="aichat-pill" onClick={() => sendText(p)} disabled={busy}>
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <form
         className="aichat-composer"
         onSubmit={(e) => {
           e.preventDefault();
-          void send();
+          sendText(input);
         }}
       >
         <textarea
@@ -255,7 +340,7 @@ export function AIChatWidget({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              void send();
+              sendText(input);
             }
           }}
         />
