@@ -1,4 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { AIChatWidget } from "@/components/chat-widget/AIChatWidget";
 
 export const Route = createFileRoute("/")({
@@ -8,7 +10,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "A plug-and-play TypeScript + React chatbot widget: floating bubble or embedded panel, token-by-token streaming, markdown messages, and localStorage history via one apiEndpoint prop.",
+          "A plug-and-play TypeScript + React chatbot widget: floating bubble, sidebar drawer, full page or embedded panel, token-by-token streaming, markdown messages, and localStorage history via one apiEndpoint prop.",
       },
       { property: "og:title", content: "AIChatWidget — plug-and-play React chat UI" },
       {
@@ -23,10 +25,17 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const usageSnippet = `import { AIChatWidget } from "@your-name/react-chat-ui";
+const usageSnippet = `import { Button } from "@/components/ui/button";
+import { AIChatWidget } from "@your-name/react-chat-ui";
 
-// Floating bubble (bottom-right corner)
+// Floating bubble (movable + resizable window)
 <AIChatWidget apiEndpoint="/api/recruiter-chat" />
+
+// Slide-in sidebar (resizable width)
+<AIChatWidget mode="sidebar" side="right" apiEndpoint="/api/recruiter-chat" />
+
+// Whole page
+<AIChatWidget mode="fullpage" apiEndpoint="/api/recruiter-chat" />
 
 // Embedded panel
 <AIChatWidget
@@ -36,7 +45,10 @@ const usageSnippet = `import { AIChatWidget } from "@your-name/react-chat-ui";
   greeting="Hi! Ask me anything about my work."
 />`;
 
+type Launcher = "floating" | "sidebar";
+
 function Index() {
+  const [launcher, setLauncher] = useState<Launcher>("floating");
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto flex max-w-3xl flex-col gap-10 px-6 py-16">
@@ -51,6 +63,19 @@ function Index() {
             bubble in the corner, or the embedded panel below.
           </p>
         </header>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Layouts</h2>
+          <p className="text-sm text-muted-foreground">Pick how the corner button opens the chat, or open the full-page version.</p>
+          <div className="flex flex-wrap gap-2">
+            {(["floating", "sidebar"] as const).map(m => (
+              <Button key={m} variant={launcher === m ? "default" : "outline"} size="sm" onClick={() => setLauncher(m)}>
+                {m === "floating" ? "Floating window" : "Sidebar drawer"}
+              </Button>
+            ))}
+            <Button asChild variant="outline" size="sm"><Link to="/chat">Full page</Link></Button>
+          </div>
+        </section>
 
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Usage</h2>
@@ -76,6 +101,9 @@ function Index() {
       </main>
 
       <AIChatWidget
+        key={launcher}
+        mode={launcher}
+        defaultOpen={launcher === "sidebar"}
         apiEndpoint="/api/public/recruiter-chat"
         title="Recruiter chat"
         greeting="Hi! I'm the demo assistant. Ask me anything."
