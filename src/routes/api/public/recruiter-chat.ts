@@ -1,35 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
-// Demo AI endpoint for the AIChatWidget. Accepts POST { messages } (with optional
-// photo / file attachments as data URLs) and streams plain text back.
-const Attachment = z.object({ name: z.string().max(200), mediaType: z.string().max(100), url: z.string().max(2_200_000) });
+// Demo AI endpoint for the AIChatWidget. Accepts POST { messages } and streams plain text back.
 const Body = z.object({
-  messages: z.array(z.object({
-    role: z.enum(["user", "assistant"]),
-    content: z.string().max(20_000),
-    attachments: z.array(Attachment).max(3).optional(),
-  })).min(1).max(50),
+  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(20_000) })).min(1).max(50),
 });
-
-function decodeText(url: string) {
-  try { return new TextDecoder().decode(Uint8Array.from(atob(url.split(",")[1] ?? ""), c => c.charCodeAt(0))).slice(0, 20_000); }
-  catch { return ""; }
-}
-
-function toParts(m: z.infer<typeof Body>["messages"][number]) {
-  if (m.role === "assistant") return [{ type: "output_text", text: m.content || " " }];
-  const parts: unknown[] = [];
-  if (m.content) parts.push({ type: "input_text", text: m.content });
-  for (const a of m.attachments ?? []) {
-    if (!a.url.startsWith("data:")) continue;
-    if (a.mediaType.startsWith("image/")) parts.push({ type: "input_image", image_url: a.url });
-    else if (a.mediaType === "application/pdf") parts.push({ type: "input_file", filename: a.name, file_data: a.url });
-    else parts.push({ type: "input_text", text: `File "${a.name}":\n${decodeText(a.url)}` });
-  }
-  if (!m.content) parts.push({ type: "input_text", text: "Please look at the attached file(s)." });
-  return parts;
-}
 
 export const Route = createFileRoute("/api/public/recruiter-chat")({
   server: {
@@ -46,8 +21,8 @@ export const Route = createFileRoute("/api/public/recruiter-chat")({
           body: JSON.stringify({
             model: "openai/gpt-6-astra",
             stream: true,
-            instructions: "You are a friendly, concise assistant inside a chat widget. Use markdown. When photos or files are attached, describe and analyze them helpfully.",
-            input: parsed.data.messages.map(m => ({ role: m.role, content: toParts(m) })),
+            instructions: "You are a friendly, concise assistant inside a chat widget. Use markdown.",
+            input: parsed.data.messages.map(m => ({ role: m.role, content: [{ type: m.role === "user" ? "input_text" : "output_text", text: m.content || " " }] })),
           }),
         });
         if (!upstream.ok || !upstream.body) {
