@@ -18,16 +18,16 @@ function decodeText(url: string) {
 }
 
 function toParts(m: z.infer<typeof Body>["messages"][number]) {
-  if (m.role === "assistant" || !m.attachments?.length) return m.content || " ";
+  if (m.role === "assistant") return [{ type: "output_text", text: m.content || " " }];
   const parts: unknown[] = [];
-  if (m.content) parts.push({ type: "text", text: m.content });
-  for (const a of m.attachments) {
+  if (m.content) parts.push({ type: "input_text", text: m.content });
+  for (const a of m.attachments ?? []) {
     if (!a.url.startsWith("data:")) continue;
-    if (a.mediaType.startsWith("image/")) parts.push({ type: "image_url", image_url: { url: a.url } });
-    else if (a.mediaType === "application/pdf") parts.push({ type: "file", file: { filename: a.name, file_data: a.url } });
-    else parts.push({ type: "text", text: `File "${a.name}":\n${decodeText(a.url)}` });
+    if (a.mediaType.startsWith("image/")) parts.push({ type: "input_image", image_url: a.url });
+    else if (a.mediaType === "application/pdf") parts.push({ type: "input_file", filename: a.name, file_data: a.url });
+    else parts.push({ type: "input_text", text: `File "${a.name}":\n${decodeText(a.url)}` });
   }
-  if (!m.content) parts.push({ type: "text", text: "Please look at the attached file(s)." });
+  if (!m.content) parts.push({ type: "input_text", text: "Please look at the attached file(s)." });
   return parts;
 }
 
@@ -40,16 +40,14 @@ export const Route = createFileRoute("/api/public/recruiter-chat")({
         const key = process.env["LOVABLE_API_KEY"];
         if (!key) return Response.json({ error: "The assistant isn't configured." }, { status: 500 });
 
-        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "openai/gpt-6-astra",
             stream: true,
-            messages: [
-              { role: "system", content: "You are a friendly, concise assistant inside a chat widget. Use markdown. When photos or files are attached, describe and analyze them helpfully." },
-              ...parsed.data.messages.map(m => ({ role: m.role, content: toParts(m) })),
-            ],
+            instructions: "You are a friendly, concise assistant inside a chat widget. Use markdown. When photos or files are attached, describe and analyze them helpfully.",
+            input: parsed.data.messages.map(m => ({ role: m.role, content: toParts(m) })),
           }),
         });
         if (!upstream.ok || !upstream.body) {
@@ -68,7 +66,8 @@ export const Route = createFileRoute("/api/public/recruiter-chat")({
               const data = line.trim().replace(/^data:\s*/, "");
               if (!data || data === "[DONE]" || !line.trim().startsWith("data:")) continue;
               try {
-                const text = JSON.parse(data).choices?.[0]?.delta?.content;
+                const evt = JSON.parse(data);
+                const text = evt.type === "response.output_text.delta" ? evt.delta : "";
                 if (text) controller.enqueue(encoder.encode(text));
               } catch { /* partial frame */ }
             }
