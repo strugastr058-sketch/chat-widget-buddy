@@ -95,7 +95,7 @@ async function streamChat(endpoint: string, messages: ChatMessage[], onText: (te
   return full;
 }
 
-function AttachmentPicker({ busy, onInput }: { busy: boolean; onInput: (hasContent: boolean) => void }) {
+function AttachmentPicker({ busy, onInput }: { busy: boolean; onInput: boolean }) {
   const attachments = usePromptInputAttachments();
   return <>
     {attachments.files.length > 0 && <div className="aichat-attachment-list" aria-label="Selected attachments">
@@ -129,7 +129,9 @@ export function AIChatWidget({ apiEndpoint, mode = "floating", title = "Chat", g
   useEffect(() => { setMessages(loadMessages(getStore(persistence), storageKey, greeting)); }, [storageKey, persistence, greeting]);
   useEffect(() => {
     if (!messages.length) return;
-    try { getStore(persistence)?.setItem(storageKey, JSON.stringify(messages)); } catch { /* Quota exceeded: current chat still works. */ }
+    // Never persist file contents (data URLs) — they quickly exceed storage quota.
+    const slim = messages.map(m => m.attachments ? { ...m, attachments: m.attachments.map(a => ({ ...a, url: "" })) } : m);
+    try { getStore(persistence)?.setItem(storageKey, JSON.stringify(slim)); } catch { /* Quota exceeded: current chat still works. */ }
   }, [messages, storageKey, persistence]);
   useEffect(() => { return () => abortRef.current?.abort(); }, []);
 

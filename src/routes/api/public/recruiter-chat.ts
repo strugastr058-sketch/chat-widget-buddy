@@ -1,39 +1,79 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 
-// Demo streaming endpoint for the AIChatWidget. Replace with your Firebase
-// function URL in production — the widget only needs POST { messages } and a
-// streamed text (or SSE) response.
+// Demo AI endpoint for the AIChatWidget. Accepts POST { messages } (with optional
+// photo / file attachments as data URLs) and streams plain text back.
+const Attachment = z.object({ name: z.string().max(200), mediaType: z.string().max(100), url: z.string().max(2_200_000) });
+const Body = z.object({
+  messages: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().max(20_000),
+    attachments: z.array(Attachment).max(3).optional(),
+  })).min(1).max(50),
+});
+
+function decodeText(url: string) {
+  try { return new TextDecoder().decode(Uint8Array.from(atob(url.split(",")[1] ?? ""), c => c.charCodeAt(0))).slice(0, 20_000); }
+  catch { return ""; }
+}
+
+function toParts(m: z.infer<typeof Body>["messages"][number]) {
+  if (m.role === "assistant") return [{ type: "output_text", text: m.content || " " }];
+  const parts: unknown[] = [];
+  if (m.content) parts.push({ type: "input_text", text: m.content });
+  for (const a of m.attachments ?? []) {
+    if (!a.url.startsWith("data:")) continue;
+    if (a.mediaType.startsWith("image/")) parts.push({ type: "input_image", image_url: a.url });
+    else if (a.mediaType === "application/pdf") parts.push({ type: "input_file", filename: a.name, file_data: a.url });
+    else parts.push({ type: "input_text", text: `File "${a.name}":\n${decodeText(a.url)}` });
+  }
+  if (!m.content) parts.push({ type: "input_text", text: "Please look at the attached file(s)." });
+  return parts;
+}
+
 export const Route = createFileRoute("/api/public/recruiter-chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const body = (await request.json().catch(() => ({}))) as {
-          messages?: { role: string; content: string }[];
-        };
-        const last = body.messages?.filter((m) => m.role === "user").pop()?.content ?? "";
+        const parsed = Body.safeParse(await request.json().catch(() => null));
+        if (!parsed.success) return Response.json({ error: "Invalid request." }, { status: 400 });
+        const key = process.env["LOVABLE_API_KEY"];
+        if (!key) return Response.json({ error: "The assistant isn't configured." }, { status: 500 });
 
-        const reply =
-          `You said: "${last}".\n\n` +
-          `This is the **demo endpoint** streaming a reply token by token. ` +
-          `Point the widget at your own backend with:\n\n` +
-          "```tsx\n<AIChatWidget apiEndpoint=\"/api/recruiter-chat\" />\n```\n\n" +
-          `- Streams plain text or SSE\n- Persists history in the browser\n- Works floating or embedded`;
+        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "openai/gpt-6-astra",
+            stream: true,
+            instructions: "You are a friendly, concise assistant inside a chat widget. Use markdown. When photos or files are attached, describe and analyze them helpfully.",
+            input: parsed.data.messages.map(m => ({ role: m.role, content: toParts(m) })),
+          }),
+        });
+        if (!upstream.ok || !upstream.body) {
+          const msg = upstream.status === 429 ? "Too many requests — please wait a moment." : upstream.status === 402 ? "AI credits are used up." : "The assistant is unavailable right now.";
+          return Response.json({ error: msg }, { status: upstream.status === 429 || upstream.status === 402 ? upstream.status : 502 });
+        }
 
-        const encoder = new TextEncoder();
-        const words = reply.split(/(?<=\s)/);
-        const stream = new ReadableStream<Uint8Array>({
-          async start(controller) {
-            for (const w of words) {
-              controller.enqueue(encoder.encode(w));
-              await new Promise((r) => setTimeout(r, 30));
+        const decoder = new TextDecoder(), encoder = new TextEncoder();
+        let buffer = "";
+        const stream = upstream.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            buffer += decoder.decode(chunk, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+              const data = line.trim().replace(/^data:\s*/, "");
+              if (!data || data === "[DONE]" || !line.trim().startsWith("data:")) continue;
+              try {
+                const evt = JSON.parse(data);
+                const text = evt.type === "response.output_text.delta" ? evt.delta : "";
+                if (text) controller.enqueue(encoder.encode(text));
+              } catch { /* partial frame */ }
             }
-            controller.close();
           },
-        });
-
-        return new Response(stream, {
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        });
+        }));
+        return new Response(stream, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
       },
     },
   },
