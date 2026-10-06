@@ -108,6 +108,14 @@ export function AIChatWidget({ apiEndpoint, mode = "floating", title = "Chat", g
     try { getStore(persistence)?.setItem(storageKey, JSON.stringify(messages)); } catch { /* Quota exceeded: current chat still works. */ }
   }, [messages, storageKey, persistence]);
   useEffect(() => { return () => abortRef.current?.abort(); }, []);
+  useEffect(() => {
+    if (!open || (mode !== "floating" && mode !== "sidebar")) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mode, open]);
 
   const run = useCallback(async (history: ChatMessage[]) => {
     const assistant: ChatMessage = { id: uid(), role: "assistant", content: "" };

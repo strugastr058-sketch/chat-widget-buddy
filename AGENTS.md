@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Keep `AIChatWidget` backend-agnostic and UI-only; media or document analysis belongs in separate integrations so the library stays focused.
