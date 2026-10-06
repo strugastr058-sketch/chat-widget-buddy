@@ -42,11 +42,7 @@ Import the widget styles once from your application entry point. The demo's comp
 Displays a launcher in a lower corner. The opened window can be moved by its header and resized from its lower-right corner on desktop.
 
 ```tsx
-<AIChatWidget
-  mode="floating"
-  position="bottom-right"
-  apiEndpoint="/api/chat"
-/>
+<AIChatWidget mode="floating" position="bottom-right" apiEndpoint="/api/chat" />
 ```
 
 ### Sidebar drawer
@@ -54,11 +50,7 @@ Displays a launcher in a lower corner. The opened window can be moved by its hea
 Opens from either side and can be resized by dragging its inner edge.
 
 ```tsx
-<AIChatWidget
-  mode="sidebar"
-  side="right"
-  apiEndpoint="/api/chat"
-/>
+<AIChatWidget mode="sidebar" side="right" apiEndpoint="/api/chat" />
 ```
 
 ### Full page
@@ -86,22 +78,22 @@ Renders inline wherever it is placed. Its container controls the surrounding pag
 
 ### `AIChatWidgetProps`
 
-| Prop | Type | Default | Description |
-| --- | --- | --- | --- |
-| `apiEndpoint` | `string` | required | URL that receives the conversation and streams the reply. |
-| `mode` | `"floating" \| "sidebar" \| "fullpage" \| "embedded"` | `"floating"` | Widget layout. |
-| `side` | `"left" \| "right"` | `"right"` | Opening side for sidebar mode. |
-| `position` | `"bottom-right" \| "bottom-left"` | `"bottom-right"` | Launcher position for floating mode. |
-| `defaultOpen` | `boolean` | `false` | Opens floating or sidebar mode on first render. |
-| `title` | `string` | `"Chat"` | Accessible panel label and visible header title. |
-| `greeting` | `string` | `"Hi! How can I help you today?"` | Initial assistant message. Pass an empty string to omit it. |
-| `placeholder` | `string` | `"Type a message…"` | Composer placeholder. |
-| `storageKey` | `string` | `"ai-chat-widget:messages"` | Browser-storage key for this conversation. Use a unique key per widget. |
-| `persistence` | `"local" \| "session" \| "none"` | `"local"` | Conversation storage policy. |
-| `initialPrompts` | `string[]` | — | Prompt buttons shown until the first user message. |
-| `showStatus` | `boolean` | `true` | Shows Thinking/Writing status in the header. |
-| `accentColor` | `string` | theme primary | Optional CSS color for the launcher and user messages. |
-| `renderMessageActions` | `(message) => ReactNode` | — | Renders custom controls beneath completed assistant messages. |
+| Prop                   | Type                                                  | Default                           | Description                                                             |
+| ---------------------- | ----------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------- |
+| `apiEndpoint`          | `string`                                              | required                          | URL that receives the conversation and streams the reply.               |
+| `mode`                 | `"floating" \| "sidebar" \| "fullpage" \| "embedded"` | `"floating"`                      | Widget layout.                                                          |
+| `side`                 | `"left" \| "right"`                                   | `"right"`                         | Opening side for sidebar mode.                                          |
+| `position`             | `"bottom-right" \| "bottom-left"`                     | `"bottom-right"`                  | Launcher position for floating mode.                                    |
+| `defaultOpen`          | `boolean`                                             | `false`                           | Opens floating or sidebar mode on first render.                         |
+| `title`                | `string`                                              | `"Chat"`                          | Accessible panel label and visible header title.                        |
+| `greeting`             | `string`                                              | `"Hi! How can I help you today?"` | Initial assistant message. Pass an empty string to omit it.             |
+| `placeholder`          | `string`                                              | `"Type a message…"`               | Composer placeholder.                                                   |
+| `storageKey`           | `string`                                              | `"ai-chat-widget:messages"`       | Browser-storage key for this conversation. Use a unique key per widget. |
+| `persistence`          | `"local" \| "session" \| "none"`                      | `"local"`                         | Conversation storage policy.                                            |
+| `initialPrompts`       | `string[]`                                            | —                                 | Prompt buttons shown until the first user message.                      |
+| `showStatus`           | `boolean`                                             | `true`                            | Shows Thinking/Writing status in the header.                            |
+| `accentColor`          | `string`                                              | theme primary                     | Optional CSS color for the launcher and user messages.                  |
+| `renderMessageActions` | `(message) => ReactNode`                              | —                                 | Renders custom controls beneath completed assistant messages.           |
 
 The package also exports the `AIChatWidgetProps` and `ChatMessage` TypeScript types.
 
