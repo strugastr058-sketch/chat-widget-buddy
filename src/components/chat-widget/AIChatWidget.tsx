@@ -39,7 +39,7 @@ export interface AIChatWidgetProps {
   initialPrompts?: string[];
   renderMessageActions?: (message: ChatMessage) => ReactNode;
   showStatus?: boolean;
-  accentColor?: string;
+  accentColor?: string | undefined;
   position?: "bottom-right" | "bottom-left";
 }
 type Status = "idle" | "submitted" | "streaming";
