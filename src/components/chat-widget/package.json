@@ -1,0 +1,13 @@
+{
+  "name": "@vegimis/react-chat-ui",
+  "version": "1.0.0",
+  "description": "UI-only streaming chat widget for React: floating, sidebar, embedded and full-page layouts.",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": { ".": "./index.ts" },
+  "files": ["*.ts", "*.tsx", "README.md", "CHANGELOG.md"],
+  "sideEffects": false,
+  "peerDependencies": { "react": ">=18" },
+  "license": "MIT"
+}

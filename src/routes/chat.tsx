@@ -15,7 +15,7 @@ export const Route = createFileRoute("/chat")({
   component: () => (
     <AIChatWidget
       mode="fullpage"
-      apiEndpoint="/api/public/recruiter-chat"
+      apiEndpoint="/api/public/chat"
       title="Recruiter chat"
       greeting="Hi! I'm the demo assistant. Ask me anything."
       storageKey="ai-chat-widget:demo-fullpage"
