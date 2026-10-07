@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight, Code2, Maximize2, PanelRight, SquareStack } from "lucide-react";
+import { ArrowRight, Code2, Maximize2, PanelRight, Settings, SquareStack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIChatWidget } from "@/components/chat-widget/AIChatWidget";
+import { useChatAccent } from "@/lib/use-chat-accent";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          'Drop <AIChatWidget apiEndpoint="/api/recruiter-chat" /> into any React app: streaming, markdown, and persistent history out of the box.',
+          'Drop <AIChatWidget apiEndpoint="/api/chat" /> into any React app: streaming, markdown, and persistent history out of the box.',
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -30,18 +31,18 @@ const usageSnippet = `import { Button } from "@/components/ui/button";
 import { AIChatWidget } from "@your-name/react-chat-ui";
 
 // Floating bubble (movable + resizable window)
-<AIChatWidget apiEndpoint="/api/recruiter-chat" />
+<AIChatWidget apiEndpoint="/api/chat" />
 
 // Slide-in sidebar (resizable width)
-<AIChatWidget mode="sidebar" side="right" apiEndpoint="/api/recruiter-chat" />
+<AIChatWidget mode="sidebar" side="right" apiEndpoint="/api/chat" />
 
 // Whole page
-<AIChatWidget mode="fullpage" apiEndpoint="/api/recruiter-chat" />
+<AIChatWidget mode="fullpage" apiEndpoint="/api/chat" />
 
 // Embedded panel
 <AIChatWidget
   mode="embedded"
-  apiEndpoint="/api/recruiter-chat"
+  apiEndpoint="/api/chat"
   title="Ask about my experience"
   greeting="Hi! Ask me anything about my work."
 />`;
@@ -50,6 +51,7 @@ type Launcher = "floating" | "sidebar";
 
 function Index() {
   const [launcher, setLauncher] = useState<Launcher>("floating");
+  const [accent] = useChatAccent();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto flex max-w-3xl flex-col gap-10 px-6 py-16">
@@ -102,6 +104,12 @@ function Index() {
                 Full page
               </Link>
             </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/config">
+                <Settings aria-hidden="true" />
+                Chat color
+              </Link>
+            </Button>
           </div>
         </section>
 
@@ -123,13 +131,14 @@ function Index() {
           <AIChatWidget
             mode="embedded"
             apiEndpoint="/api/public/chat"
-            title="Recruiter chat (embedded)"
+            title="AI Chat (embedded)"
             greeting="Hi! I'm the demo assistant. Ask me anything."
             storageKey="ai-chat-widget:demo-embedded"
+            accentColor={accent}
             initialPrompts={[
-              "What is his experience with Java?",
-              "What projects has he shipped?",
-              "Is he open to freelance work?",
+              "What can you help me with?",
+              "Explain streaming in one sentence",
+              "Tell me a fun fact",
             ]}
           />
           <Button asChild variant="link" className="w-fit px-0">
@@ -145,9 +154,10 @@ function Index() {
         mode={launcher}
         defaultOpen={launcher === "sidebar"}
         apiEndpoint="/api/public/chat"
-        title="Recruiter chat"
+        title="AI Chat"
         greeting="Hi! I'm the demo assistant. Ask me anything."
         storageKey="ai-chat-widget:demo-floating"
+        accentColor={accent}
       />
     </div>
   );
