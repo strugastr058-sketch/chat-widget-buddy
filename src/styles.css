@@ -183,3 +183,4 @@
 .aichat-resize { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; display: grid; place-items: center; cursor: nwse-resize; color: var(--color-muted-foreground); touch-action: none; }
 @media (max-width: 480px) { .aichat-resize { display: none; } .aichat-panel--positioned { position: relative; left: auto !important; top: auto !important; width: min(24rem, calc(100vw - 2.5rem)) !important; height: min(34rem, calc(100dvh - 7rem)) !important; } }
 @media (prefers-reduced-motion: reduce) { .aichat-bubble { transition: none; } .aichat-panel--sidebar { animation: none; } }
+.aichat-footer button[type="submit"] { background: var(--aichat-accent, var(--color-primary)); color: var(--color-primary-foreground); }
