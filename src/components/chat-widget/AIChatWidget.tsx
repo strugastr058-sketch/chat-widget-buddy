@@ -299,13 +299,14 @@ export function AIChatWidget({
     <div
       ref={panelRef}
       className={`aichat-panel aichat-panel--${mode} ${mode === "sidebar" ? `aichat-panel--side-${side}` : ""} ${mode === "floating" && box ? "aichat-panel--positioned" : ""}`}
-      style={
-        mode === "floating" && box
+      style={{
+        ...(accentColor ? ({ "--aichat-accent": accentColor } as React.CSSProperties) : {}),
+        ...(mode === "floating" && box
           ? { left: box.x, top: box.y, width: box.width, height: box.height }
           : mode === "sidebar"
             ? { width: sidebarWidth }
-            : undefined
-      }
+            : {}),
+      }}
       role={mode === "floating" || mode === "sidebar" ? "dialog" : "region"}
       aria-label={title}
     >
