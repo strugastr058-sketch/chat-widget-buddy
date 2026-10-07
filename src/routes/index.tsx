@@ -122,7 +122,7 @@ function Index() {
           </p>
           <AIChatWidget
             mode="embedded"
-            apiEndpoint="/api/public/recruiter-chat"
+            apiEndpoint="/api/public/chat"
             title="Recruiter chat (embedded)"
             greeting="Hi! I'm the demo assistant. Ask me anything."
             storageKey="ai-chat-widget:demo-embedded"
@@ -144,7 +144,7 @@ function Index() {
         key={launcher}
         mode={launcher}
         defaultOpen={launcher === "sidebar"}
-        apiEndpoint="/api/public/recruiter-chat"
+        apiEndpoint="/api/public/chat"
         title="Recruiter chat"
         greeting="Hi! I'm the demo assistant. Ask me anything."
         storageKey="ai-chat-widget:demo-floating"

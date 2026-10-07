@@ -12,3 +12,4 @@
 <!-- LOVABLE:END -->
 
 - Keep `AIChatWidget` backend-agnostic and UI-only; media or document analysis belongs in separate integrations so the library stays focused.
+- Chat widget is versioned (VERSION/package.json/CHANGELOG in its folder); AI backend is ai-gateway-hub pinned by tag in src/lib/ai-gateway — upgrade by replacing that folder from a newer tag.

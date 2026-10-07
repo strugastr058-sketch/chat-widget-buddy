@@ -210,3 +210,10 @@ This repository is a working source implementation and demo, not yet a published
 ## License
 
 No license has been selected yet. Add a `LICENSE` file before distributing the package publicly.
+
+## Versions & AI connection
+
+- This widget is versioned: `VERSION` in `src/components/chat-widget/index.ts`, `package.json` + `CHANGELOG.md` in the same folder. Release by bumping all three and tagging `vX.Y.Z`.
+- AI answers come from [ai-gateway-hub](https://github.com/vegimis/ai-gateway-hub) **v1.2.0**, pinned as a copy in `src/lib/ai-gateway`, served at `POST /api/public/chat`.
+- Set the server secret `AI_PROVIDER_API_KEY` (Gemini, OpenAI, Claude, Groq… auto-detected).
+- To upgrade later: copy `src/lib/ai-gateway` from the new tag (e.g. `v1.3.0`), or once the library lives at a repo root, `bun add github:vegimis/ai-gateway#v1.3.0` and change the import.
