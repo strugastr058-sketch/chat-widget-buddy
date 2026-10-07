@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as ConfigRouteImport } from './routes/config'
 import { Route as ApiPublicChatRouteImport } from './routes/api/public/chat'
 import { Route as ApiPublicRecruiterChatRouteImport } from './routes/api/public/recruiter-chat'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfigRoute = ConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicChatRoute = ApiPublicChatRouteImport.update({
@@ -38,12 +44,14 @@ const ApiPublicRecruiterChatRoute = ApiPublicRecruiterChatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/config': typeof ConfigRoute
   '/api/public/chat': typeof ApiPublicChatRoute
   '/api/public/recruiter-chat': typeof ApiPublicRecruiterChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/config': typeof ConfigRoute
   '/api/public/chat': typeof ApiPublicChatRoute
   '/api/public/recruiter-chat': typeof ApiPublicRecruiterChatRoute
 }
@@ -51,18 +59,30 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/config': typeof ConfigRoute
   '/api/public/chat': typeof ApiPublicChatRoute
   '/api/public/recruiter-chat': typeof ApiPublicRecruiterChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chat' | '/api/public/chat' | '/api/public/recruiter-chat'
+  fullPaths:
+    | '/'
+    | '/chat'
+    | '/config'
+    | '/api/public/chat'
+    | '/api/public/recruiter-chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/api/public/chat' | '/api/public/recruiter-chat'
+  to:
+    | '/'
+    | '/chat'
+    | '/config'
+    | '/api/public/chat'
+    | '/api/public/recruiter-chat'
   id:
     | '__root__'
     | '/'
     | '/chat'
+    | '/config'
     | '/api/public/chat'
     | '/api/public/recruiter-chat'
   fileRoutesById: FileRoutesById
@@ -70,6 +90,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
+  ConfigRoute: typeof ConfigRoute
   ApiPublicChatRoute: typeof ApiPublicChatRoute
   ApiPublicRecruiterChatRoute: typeof ApiPublicRecruiterChatRoute
 }
@@ -88,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/config': {
+      id: '/config'
+      path: '/config'
+      fullPath: '/config'
+      preLoaderRoute: typeof ConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/chat': {
@@ -110,6 +138,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
+  ConfigRoute: ConfigRoute,
   ApiPublicChatRoute: ApiPublicChatRoute,
   ApiPublicRecruiterChatRoute: ApiPublicRecruiterChatRoute,
 }
