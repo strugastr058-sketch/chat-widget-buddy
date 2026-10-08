@@ -137,7 +137,7 @@ function Index() {
             greeting={texts.greeting}
             storageKey="ai-chat-widget:demo-embedded"
             accentColor={accent}
-            initialPrompts={texts.prompts}
+            initialPrompts={texts.prompts.filter((p) => p.trim())}
           />
           <Button asChild variant="link" className="w-fit px-0">
             <Link to="/chat">
@@ -154,7 +154,7 @@ function Index() {
         apiEndpoint="/api/public/chat"
         title="AI Chat"
         greeting={texts.greeting}
-        initialPrompts={texts.prompts}
+        initialPrompts={texts.prompts.filter((p) => p.trim())}
         storageKey="ai-chat-widget:demo-floating"
         accentColor={accent}
       />

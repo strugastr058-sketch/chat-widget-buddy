@@ -10,14 +10,21 @@ export interface ChatTexts {
 
 export const DEFAULT_TEXTS: ChatTexts = {
   greeting: "Hi! I'm the demo assistant. Ask me anything.",
-  prompts: ["What can you help me with?", "Explain streaming in one sentence", "Tell me a fun fact"],
+  prompts: [
+    "What can you help me with?",
+    "Explain streaming in one sentence",
+    "Tell me a fun fact",
+  ],
 };
 
 function read(): ChatTexts {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw && typeof raw.greeting === "string" && Array.isArray(raw.prompts)) {
-      return { greeting: raw.greeting, prompts: raw.prompts.filter((p: unknown) => typeof p === "string") };
+      return {
+        greeting: raw.greeting,
+        prompts: raw.prompts.filter((p: unknown) => typeof p === "string"),
+      };
     }
   } catch {
     /* ignore bad data */

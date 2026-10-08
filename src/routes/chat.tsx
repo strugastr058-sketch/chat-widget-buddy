@@ -34,7 +34,7 @@ function ChatPage() {
       accentColor={accent}
       greeting={texts.greeting}
       storageKey="ai-chat-widget:demo-fullpage"
-      initialPrompts={texts.prompts}
+      initialPrompts={texts.prompts.filter((p) => p.trim())}
     />
   );
 }
