@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AIChatWidget } from "@/components/chat-widget/AIChatWidget";
 import { useChatAccent } from "@/lib/use-chat-accent";
+import { useChatTexts } from "@/lib/use-chat-texts";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({
@@ -24,15 +25,16 @@ export const Route = createFileRoute("/chat")({
 
 function ChatPage() {
   const [accent] = useChatAccent();
+  const [texts] = useChatTexts();
   return (
     <AIChatWidget
       mode="fullpage"
       apiEndpoint="/api/public/chat"
       title="AI Chat"
       accentColor={accent}
-      greeting="Hi! I'm the demo assistant. Ask me anything."
+      greeting={texts.greeting}
       storageKey="ai-chat-widget:demo-fullpage"
-      initialPrompts={["What can you help me with?", "Tell me a fun fact"]}
+      initialPrompts={texts.prompts.filter((p) => p.trim())}
     />
   );
 }
