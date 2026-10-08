@@ -14,7 +14,7 @@ A backend-agnostic, plug-and-play chat interface for React and TypeScript.
 - Plain-text and Server-Sent Events (SSE) streaming
 - Markdown-formatted assistant messages
 - Loading, streaming, empty-response, and retry states
-- Starter prompt buttons
+- Configurable greeting, starter prompts, header title, and composer hint
 - Local, session, or disabled browser persistence
 - Clear-conversation control and automatic scroll management
 - Custom assistant-message actions
@@ -73,6 +73,45 @@ Renders inline wherever it is placed. Its container controls the surrounding pag
   apiEndpoint="/api/chat"
 />
 ```
+
+## Copy and starter prompts
+
+Nothing a visitor reads is hard-coded. The greeting, the starter questions, the header title, and the composer hint are all props, so the same widget can serve recruiting, support, onboarding, or documentation without touching library code.
+
+```tsx
+<AIChatWidget
+  apiEndpoint="/api/chat"
+  title="AI Chat"
+  greeting="Hi! I'm the demo assistant. Ask me anything."
+  placeholder="Type a message…"
+  initialPrompts={[
+    "What can you help me with?",
+    "Explain streaming in one sentence",
+    "Tell me a fun fact",
+  ]}
+/>
+```
+
+| Setting           | Prop             | Behaviour                                                                                        |
+| ----------------- | ---------------- | ------------------------------------------------------------------------------------------------ |
+| Greeting          | `greeting`       | Shown as the first assistant message. Pass `""` to start with an empty transcript.               |
+| Starter questions | `initialPrompts` | One button per entry, listed until the first user message; clicking one sends it. Omit for none. |
+| Header label      | `title`          | Visible header text and accessible panel name.                                                   |
+| Composer hint     | `placeholder`    | Hint shown in the empty input.                                                                   |
+
+Starter buttons disappear as soon as the visitor sends a message, so keep them short and answerable. Because both settings are plain props, they can come from your own configuration — a CMS field, a tenant record, an A/B test, or environment variables:
+
+```tsx
+const copy = await loadWidgetCopy("recruiting"); // { greeting, prompts }
+
+<AIChatWidget
+  apiEndpoint="/api/chat"
+  greeting={copy.greeting}
+  initialPrompts={copy.prompts.filter(Boolean)}
+/>;
+```
+
+The demo site exposes the same two settings on its Settings page (`/config`): one box for the greeting, one for the starter questions, one per line. Those edits are saved in this browser and apply to every layout on the demo site. The page belongs to the demo, not to the library — in your own app, pass the props directly.
 
 ## API
 
