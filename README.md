@@ -14,7 +14,7 @@ A backend-agnostic, plug-and-play chat interface for React and TypeScript.
 - Plain-text and Server-Sent Events (SSE) streaming
 - Markdown-formatted assistant messages
 - Loading, streaming, empty-response, and retry states
-- Starter prompt buttons
+- Configurable greeting, starter prompts, header title, and composer hint
 - Local, session, or disabled browser persistence
 - Clear-conversation control and automatic scroll management
 - Custom assistant-message actions
