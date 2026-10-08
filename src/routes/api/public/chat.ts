@@ -20,7 +20,8 @@ export const Route = createFileRoute("/api/public/chat")({
         try {
           const ai = createGateway({ env: process.env as Record<string, string | undefined> });
           const { textStream } = await ai.chat({
-            systemPrompt: "You are a friendly, concise assistant inside a chat widget. Use markdown.",
+            systemPrompt:
+              "You are a friendly, concise assistant inside a chat widget. Use markdown.",
             messages: parsed.data.messages,
             stream: true,
             signal: request.signal,

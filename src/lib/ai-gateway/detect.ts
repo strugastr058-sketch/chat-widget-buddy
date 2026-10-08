@@ -9,7 +9,8 @@ export function detectProviderFromKey(apiKey: string): Provider | null {
   let best: { p: Provider; len: number } | null = null;
   for (const p of PROVIDER_IDS) {
     for (const prefix of PROVIDERS[p].prefixes) {
-      if (key.startsWith(prefix) && prefix.length > (best?.len ?? 0)) best = { p, len: prefix.length };
+      if (key.startsWith(prefix) && prefix.length > (best?.len ?? 0))
+        best = { p, len: prefix.length };
     }
   }
   // DeepSeek keys look like OpenAI's ("sk-" + 32 hex) — probe instead of guessing.
@@ -21,11 +22,22 @@ export function detectProviderFromKey(apiKey: string): Provider | null {
  * Detects the provider: key prefix first (free, instant), then a live
  * `GET /models` probe against prefix-less providers.
  */
-export async function detectProvider(apiKey: string, fetchImpl: typeof fetch = fetch): Promise<Provider> {
+export async function detectProvider(
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Provider> {
   const guess = detectProviderFromKey(apiKey);
   if (guess) return guess;
 
-  const candidates: Provider[] = ["deepseek", "openai", "mistral", "together", "groq", "anthropic", "google"];
+  const candidates: Provider[] = [
+    "deepseek",
+    "openai",
+    "mistral",
+    "together",
+    "groq",
+    "anthropic",
+    "google",
+  ];
   const results = await Promise.all(
     candidates.map(async (p) => {
       try {
@@ -39,5 +51,10 @@ export async function detectProvider(apiKey: string, fetchImpl: typeof fetch = f
   );
   const found = results.find((p): p is Provider => p !== null);
   if (found) return found;
-  throw new AIGatewayError("Could not determine the provider for this API key.", 400, undefined, "detection_failed");
+  throw new AIGatewayError(
+    "Could not determine the provider for this API key.",
+    400,
+    undefined,
+    "detection_failed",
+  );
 }

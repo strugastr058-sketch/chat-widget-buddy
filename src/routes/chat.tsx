@@ -6,9 +6,15 @@ export const Route = createFileRoute("/chat")({
   head: () => ({
     meta: [
       { title: "Full-page chat — AIChatWidget demo" },
-      { name: "description", content: "AIChatWidget in fullpage mode: the whole screen becomes a streaming chat." },
+      {
+        name: "description",
+        content: "AIChatWidget in fullpage mode: the whole screen becomes a streaming chat.",
+      },
       { property: "og:title", content: "Full-page chat — AIChatWidget demo" },
-      { property: "og:description", content: "See the React chat UI library filling the whole page." },
+      {
+        property: "og:description",
+        content: "See the React chat UI library filling the whole page.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

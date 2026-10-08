@@ -39,20 +39,39 @@ async function run(config: GatewayConfig): Promise<StartupReport> {
   let provider: string | undefined;
   try {
     provider = await gateway.provider;
-    console.log(`${TAG} key found (${gateway.keySource}) → provider: ${provider}. Asking the AI to say hello…`);
+    console.log(
+      `${TAG} key found (${gateway.keySource}) → provider: ${provider}. Asking the AI to say hello…`,
+    );
     const res = await gateway.chat({
       prompt:
         "You are being started inside an app. In one short sentence, greet the developer and say which AI model you are.",
       maxTokens: 80,
     });
     const reply = res.text.trim();
-    console.log(`${TAG} ✅ active — provider: ${res.provider}, model: ${res.model}, key: ${gateway.keySource} (${ms()}ms)`);
+    console.log(
+      `${TAG} ✅ active — provider: ${res.provider}, model: ${res.model}, key: ${gateway.keySource} (${ms()}ms)`,
+    );
     console.log(`${TAG} 🤖 AI says: "${reply}"`);
-    return { ok: true, provider: res.provider, model: res.model, keySource: gateway.keySource, reply, ms: ms() };
+    return {
+      ok: true,
+      provider: res.provider,
+      model: res.model,
+      keySource: gateway.keySource,
+      reply,
+      ms: ms(),
+    };
   } catch (e) {
     const error = (e as Error).message;
-    console.warn(`${TAG} ⚠️ key present but AI did not answer${provider ? ` (${provider})` : ""}: ${error.slice(0, 300)}`);
+    console.warn(
+      `${TAG} ⚠️ key present but AI did not answer${provider ? ` (${provider})` : ""}: ${error.slice(0, 300)}`,
+    );
     console.warn(`${TAG} the app keeps running; chat calls will retry on demand.`);
-    return { ok: false, ...(provider ? { provider } : {}), keySource: gateway.keySource, error, ms: ms() };
+    return {
+      ok: false,
+      ...(provider ? { provider } : {}),
+      keySource: gateway.keySource,
+      error,
+      ms: ms(),
+    };
   }
 }
