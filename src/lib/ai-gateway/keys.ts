@@ -30,9 +30,14 @@ export function defaultEnv(): EnvSource {
 export function parseKeys(input?: string | string[]): string[] {
   if (!input) return [];
   if (Array.isArray(input)) {
-    return input.flatMap((k) => (typeof k === "string" ? k.trim().split(/[\s,]+/) : [])).filter(Boolean);
+    return input
+      .flatMap((k) => (typeof k === "string" ? k.trim().split(/[\s,]+/) : []))
+      .filter(Boolean);
   }
-  return input.trim().split(/[\s,]+/).filter(Boolean);
+  return input
+    .trim()
+    .split(/[\s,]+/)
+    .filter(Boolean);
 }
 
 export interface ResolvedKey {
@@ -48,4 +53,3 @@ export function resolveKeyFromEnv(env: EnvSource = defaultEnv()): ResolvedKey | 
   }
   return null;
 }
-

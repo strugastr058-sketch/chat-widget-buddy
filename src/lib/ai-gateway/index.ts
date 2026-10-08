@@ -1,5 +1,12 @@
 import { detectProvider, detectProviderFromKey } from "./detect";
-import { ENV_KEYS, ENV_MODEL, ENV_PROVIDER, defaultEnv, resolveKeyFromEnv, parseKeys } from "./keys";
+import {
+  ENV_KEYS,
+  ENV_MODEL,
+  ENV_PROVIDER,
+  defaultEnv,
+  resolveKeyFromEnv,
+  parseKeys,
+} from "./keys";
 import {
   DEFAULT_MODELS,
   PROVIDERS,
@@ -68,7 +75,7 @@ export function createGateway(config: GatewayConfig = {}): Gateway {
   const fetchImpl = config.fetch ?? fetch;
   const env = config.env ?? defaultEnv();
 
-  let rawKeyString = config.apiKey?.trim();
+  const rawKeyString = config.apiKey?.trim();
   let candidateKeys = parseKeys(config.apiKeys ?? rawKeyString);
   let keySource = "config";
 
@@ -109,7 +116,12 @@ export function createGateway(config: GatewayConfig = {}): Gateway {
       return await fetchImpl(url, { ...init, signal: ac.signal });
     } catch (e) {
       if (ac.signal.reason === "timeout") {
-        throw new AIGatewayError(`${provider} did not respond within ${timeoutMs}ms.`, 504, provider, "timeout");
+        throw new AIGatewayError(
+          `${provider} did not respond within ${timeoutMs}ms.`,
+          504,
+          provider,
+          "timeout",
+        );
       }
       throw e;
     } finally {
@@ -124,7 +136,8 @@ export function createGateway(config: GatewayConfig = {}): Gateway {
 
   const candidates: KeyCandidate[] = candidateKeys.map((k, idx) => ({
     key: k,
-    getProvider: () => (pinned && idx === 0 ? Promise.resolve(pinned) : detectProvider(k, fetchImpl)),
+    getProvider: () =>
+      pinned && idx === 0 ? Promise.resolve(pinned) : detectProvider(k, fetchImpl),
   }));
 
   const primaryProviderPromise = candidates[0]!.getProvider();
@@ -141,9 +154,13 @@ export function createGateway(config: GatewayConfig = {}): Gateway {
         provider = await candidate.getProvider();
       } catch (detErr: unknown) {
         const msg = detErr instanceof Error ? detErr.message : String(detErr);
-        failures.push(`Key #${i + 1} (${candidate.key.slice(0, 8)}...): provider detection failed - ${msg}`);
+        failures.push(
+          `Key #${i + 1} (${candidate.key.slice(0, 8)}...): provider detection failed - ${msg}`,
+        );
         if (i < candidates.length - 1) {
-          console.warn(`[ai-gateway] Key #${i + 1} detection failed. Jumping to next key #${i + 2}...`);
+          console.warn(
+            `[ai-gateway] Key #${i + 1} detection failed. Jumping to next key #${i + 2}...`,
+          );
           continue;
         }
         break;
@@ -223,7 +240,8 @@ export function createGateway(config: GatewayConfig = {}): Gateway {
         }
         throw new AIGatewayError(
           candidates.length > 1
-            ? `All ${candidates.length} API keys exhausted:\n` + failures.map((f) => `  • ${f}`).join("\n")
+            ? `All ${candidates.length} API keys exhausted:\n` +
+                failures.map((f) => `  • ${f}`).join("\n")
             : errMsg,
           err instanceof AIGatewayError ? err.status : 502,
           provider,
@@ -242,17 +260,22 @@ export function createGateway(config: GatewayConfig = {}): Gateway {
 
   async function listModels(): Promise<string[]> {
     const provider = await primaryProviderPromise;
-    const res = await fetchImpl(modelsUrl(provider), { headers: authHeaders(provider, candidateKeys[0] || "") });
+    const res = await fetchImpl(modelsUrl(provider), {
+      headers: authHeaders(provider, candidateKeys[0] || ""),
+    });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      throw new AIGatewayError(`${provider} model list failed (${res.status}): ${detail.slice(0, 300)}`, res.status, provider);
+      throw new AIGatewayError(
+        `${provider} model list failed (${res.status}): ${detail.slice(0, 300)}`,
+        res.status,
+        provider,
+      );
     }
     return parseModels(provider, await res.json()).sort();
   }
 
   return { provider: primaryProviderPromise, keySource, listModels, chat: chat as Gateway["chat"] };
 }
-
 
 type OneShot = ChatOptions & Pick<GatewayConfig, "apiKey" | "env" | "provider" | "fetch">;
 

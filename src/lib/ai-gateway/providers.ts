@@ -170,8 +170,16 @@ function pick<T>(value: unknown, path: (string | number)[]): T | undefined {
 
 /** Joins all text parts (Gemini can split one reply into several parts). */
 function geminiText(json: unknown): string {
-  const parts = pick<Array<{ text?: string; thought?: boolean }>>(json, ["candidates", 0, "content", "parts"]);
-  return (parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("");
+  const parts = pick<Array<{ text?: string; thought?: boolean }>>(json, [
+    "candidates",
+    0,
+    "content",
+    "parts",
+  ]);
+  return (parts ?? [])
+    .filter((p) => !p.thought)
+    .map((p) => p.text ?? "")
+    .join("");
 }
 
 /** Auth headers used for both chat and the /models listing. */
@@ -203,7 +211,9 @@ export function buildRequest(
           role: m.role === "assistant" ? "model" : "user",
           parts: [{ text: m.content }],
         })),
-        ...(options.systemPrompt ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } } : {}),
+        ...(options.systemPrompt
+          ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
+          : {}),
         generationConfig: {
           ...(options.temperature != null ? { temperature: options.temperature } : {}),
           ...(options.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
@@ -267,7 +277,8 @@ export function modelsUrl(provider: Provider): string {
 /** Normalises any provider's /models response to a list of chat model ids. */
 export function parseModels(provider: Provider, json: unknown): string[] {
   if (PROVIDERS[provider].kind === "google") {
-    const list = pick<Array<{ name: string; supportedGenerationMethods?: string[] }>>(json, ["models"]) ?? [];
+    const list =
+      pick<Array<{ name: string; supportedGenerationMethods?: string[] }>>(json, ["models"]) ?? [];
     return list
       .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
       .map((m) => m.name.replace(/^models\//, ""));

@@ -103,6 +103,11 @@ export class AIGatewayError extends Error {
 
   /** True when trying again later may succeed (rate limit / overload / 5xx). */
   get retryable(): boolean {
-    return this.code === "rate_limited" || this.code === "overloaded" || this.code === "timeout" || (this.status ?? 0) >= 500;
+    return (
+      this.code === "rate_limited" ||
+      this.code === "overloaded" ||
+      this.code === "timeout" ||
+      (this.status ?? 0) >= 500
+    );
   }
 }

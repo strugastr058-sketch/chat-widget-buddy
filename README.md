@@ -26,7 +26,7 @@ A backend-agnostic, plug-and-play chat interface for React and TypeScript.
 This repository currently contains the package source and an interactive demo. Until the package is published to a registry, copy `src/components/chat-widget` and its referenced UI primitives into your React project, or consume the repository through your existing workspace setup.
 
 ```tsx
-import { AIChatWidget } from "@your-name/react-chat-ui";
+import { AIChatWidget } from "@vegimis/react-chat-ui";
 
 export function App() {
   return <AIChatWidget apiEndpoint="/api/chat" />;
@@ -205,11 +205,11 @@ bun run build
 
 ## Repository status
 
-This repository is a working source implementation and demo, not yet a published npm package. Replace the placeholder package scope (`@your-name/react-chat-ui`) and add your preferred package build/release configuration before publishing it to a registry.
+Production release **v1.0.0**. Install from GitHub by tag once the widget folder is published at a repo root, e.g. `bun add github:vegimis/react-chat-ui#v1.0.0`.
 
 ## License
 
-No license has been selected yet. Add a `LICENSE` file before distributing the package publicly.
+MIT — see `LICENSE`.
 
 ## Versions & AI connection
 

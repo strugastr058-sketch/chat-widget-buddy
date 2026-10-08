@@ -46,7 +46,9 @@ function ConfigPage() {
         </header>
 
         <section className="flex flex-col gap-4" aria-labelledby="color-title">
-          <h2 id="color-title" className="text-lg font-semibold">Color</h2>
+          <h2 id="color-title" className="text-lg font-semibold">
+            Color
+          </h2>
           <div className="flex flex-wrap gap-3">
             {PRESETS.map((p) => {
               const active = (accent ?? undefined) === p.value;

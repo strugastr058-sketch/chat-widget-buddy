@@ -28,7 +28,7 @@ export const Route = createFileRoute("/")({
 });
 
 const usageSnippet = `import { Button } from "@/components/ui/button";
-import { AIChatWidget } from "@your-name/react-chat-ui";
+import { AIChatWidget } from "@vegimis/react-chat-ui";
 
 // Floating bubble (movable + resizable window)
 <AIChatWidget apiEndpoint="/api/chat" />
@@ -57,7 +57,7 @@ function Index() {
       <main className="mx-auto flex max-w-3xl flex-col gap-10 px-6 py-16">
         <header className="flex flex-col gap-4 border-b border-border pb-10">
           <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            @your-name/react-chat-ui
+            @vegimis/react-chat-ui
           </span>
           <h1 className="text-4xl font-bold sm:text-5xl">AIChatWidget</h1>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground">
