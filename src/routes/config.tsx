@@ -3,6 +3,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIChatWidget } from "@/components/chat-widget/AIChatWidget";
 import { useChatAccent } from "@/lib/use-chat-accent";
+import { useChatTexts } from "@/lib/use-chat-texts";
 
 const PRESETS = [
   { name: "Default", value: undefined },
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/config")({
 
 function ConfigPage() {
   const [accent, setAccent] = useChatAccent();
+  const [texts, setTexts] = useChatTexts();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-12">
@@ -84,15 +86,47 @@ function ConfigPage() {
           </label>
         </section>
 
+        <section className="flex flex-col gap-4" aria-labelledby="texts-title">
+          <h2 id="texts-title" className="text-lg font-semibold">
+            Greeting & starter questions
+          </h2>
+          <label className="flex flex-col gap-1 text-sm">
+            Greeting message
+            <input
+              value={texts.greeting}
+              onChange={(e) => setTexts({ ...texts, greeting: e.target.value })}
+              className="rounded-md border border-input bg-background px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Starter questions (one per line)
+            <textarea
+              rows={4}
+              value={texts.prompts.join("\n")}
+              onChange={(e) => setTexts({ ...texts, prompts: e.target.value.split("\n") })}
+              className="rounded-md border border-input bg-background px-3 py-2"
+            />
+          </label>
+          <Button variant="outline" className="w-fit" onClick={() => setTexts(null)}>
+            Reset to defaults
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Starter questions show until the first message. Use the chat's clear button to see a new
+            greeting.
+          </p>
+        </section>
+
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Preview</h2>
           <AIChatWidget
+            key={texts.greeting}
             mode="embedded"
             apiEndpoint="/api/public/chat"
             title="AI Chat"
             accentColor={accent}
-            storageKey="ai-chat-widget:demo-config"
-            initialPrompts={["Say hello", "Tell me a fun fact"]}
+            greeting={texts.greeting}
+            persistence="none"
+            initialPrompts={texts.prompts.filter((p) => p.trim())}
           />
         </section>
       </main>

@@ -4,6 +4,7 @@ import { ArrowRight, Code2, Maximize2, PanelRight, Settings, SquareStack } from 
 import { Button } from "@/components/ui/button";
 import { AIChatWidget } from "@/components/chat-widget/AIChatWidget";
 import { useChatAccent } from "@/lib/use-chat-accent";
+import { useChatTexts } from "@/lib/use-chat-texts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -52,6 +53,7 @@ type Launcher = "floating" | "sidebar";
 function Index() {
   const [launcher, setLauncher] = useState<Launcher>("floating");
   const [accent] = useChatAccent();
+  const [texts] = useChatTexts();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto flex max-w-3xl flex-col gap-10 px-6 py-16">
@@ -132,14 +134,10 @@ function Index() {
             mode="embedded"
             apiEndpoint="/api/public/chat"
             title="AI Chat (embedded)"
-            greeting="Hi! I'm the demo assistant. Ask me anything."
+            greeting={texts.greeting}
             storageKey="ai-chat-widget:demo-embedded"
             accentColor={accent}
-            initialPrompts={[
-              "What can you help me with?",
-              "Explain streaming in one sentence",
-              "Tell me a fun fact",
-            ]}
+            initialPrompts={texts.prompts}
           />
           <Button asChild variant="link" className="w-fit px-0">
             <Link to="/chat">
@@ -155,7 +153,8 @@ function Index() {
         defaultOpen={launcher === "sidebar"}
         apiEndpoint="/api/public/chat"
         title="AI Chat"
-        greeting="Hi! I'm the demo assistant. Ask me anything."
+        greeting={texts.greeting}
+        initialPrompts={texts.prompts}
         storageKey="ai-chat-widget:demo-floating"
         accentColor={accent}
       />
