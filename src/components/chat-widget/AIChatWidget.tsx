@@ -1,12 +1,30 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { MessageCircle, X, Trash2, RotateCcw, Grip } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Grip,
+  MessageCircle,
+  RefreshCw,
+  RotateCcw,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import {
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
   PromptInput,
@@ -15,40 +33,33 @@ import {
   PromptInputTextarea,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
+import { streamChat } from "./stream";
+import { resolve, type AIChatWidgetProps, type ChatFeatures, type ChatMessage } from "./types";
 
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  error?: boolean;
-}
-export interface AIChatWidgetProps {
-  /** POST { messages: [{ role, content }] }; returns streaming plain text or SSE. */
-  apiEndpoint: string;
-  /** floating = bubble + movable window, sidebar = slide-in drawer, fullpage = fills the screen, embedded = inline panel. */
-  mode?: "floating" | "sidebar" | "fullpage" | "embedded";
-  /** Which side the sidebar opens from. */
-  side?: "left" | "right";
-  /** Start opened (floating/sidebar). */
-  defaultOpen?: boolean;
-  title?: string;
-  greeting?: string;
-  placeholder?: string;
-  storageKey?: string;
-  persistence?: "local" | "session" | "none";
-  initialPrompts?: string[];
-  renderMessageActions?: (message: ChatMessage) => ReactNode;
-  showStatus?: boolean;
-  accentColor?: string | undefined;
-  position?: "bottom-right" | "bottom-left";
-}
+export type { AIChatWidgetProps, ChatMessage, ChatFeatures } from "./types";
+
 type Status = "idle" | "submitted" | "streaming";
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const DEFAULT_FEATURES: Required<ChatFeatures> = {
+  stop: true,
+  copy: true,
+  regenerate: true,
+  feedback: false,
+  sources: true,
+  clear: true,
+  timestamps: false,
+};
 
 function getStore(p: AIChatWidgetProps["persistence"]): Storage | null {
   if (p === "none" || typeof window === "undefined") return null;
-  return p === "session" ? window.sessionStorage : window.localStorage;
+  try {
+    return p === "session" ? window.sessionStorage : window.localStorage;
+  } catch {
+    return null;
+  }
 }
+const greetingMessage = (greeting?: string): ChatMessage[] =>
+  greeting ? [{ id: uid(), role: "assistant", content: greeting }] : [];
 function loadMessages(store: Storage | null, key: string, greeting?: string): ChatMessage[] {
   try {
     const raw = store?.getItem(key);
@@ -59,89 +70,69 @@ function loadMessages(store: Storage | null, key: string, greeting?: string): Ch
   } catch {
     /* Browser storage may be unavailable. */
   }
-  return greeting ? [{ id: uid(), role: "assistant", content: greeting }] : [];
+  return greetingMessage(greeting);
 }
-async function streamChat(
-  endpoint: string,
-  messages: ChatMessage[],
-  onText: (text: string) => void,
-  signal: AbortSignal,
-) {
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal,
-    body: JSON.stringify({
-      messages: messages.filter((m) => !m.error).map(({ role, content }) => ({ role, content })),
-    }),
-  });
-  if (!res.ok) {
-    const detail = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(detail?.error || `Chat request failed (${res.status})`);
-  }
-  if (!res.body) throw new Error("The assistant returned no response.");
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let full = "",
-    buffer = "";
-  const sse = (res.headers.get("content-type") ?? "").includes("text/event-stream");
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    if (!sse) {
-      full += chunk;
-      onText(full);
-      continue;
-    }
-    buffer += chunk;
-    const frames = buffer.split(/\r?\n\r?\n/);
-    buffer = frames.pop() ?? "";
-    for (const frame of frames) {
-      for (const line of frame.split(/\r?\n/)) {
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (payload === "[DONE]") continue;
-        try {
-          const data = JSON.parse(payload) as {
-            token?: string;
-            text?: string;
-            content?: string;
-            error?: string;
-          };
-          if (data.error) throw new Error(data.error);
-          full += data.token ?? data.text ?? data.content ?? "";
-        } catch (e) {
-          if (e instanceof SyntaxError) full += payload;
-          else throw e;
-        }
-      }
-    }
-    onText(full);
-  }
-  return full;
+
+function useDarkTheme(theme: AIChatWidgetProps["theme"]) {
+  const [systemDark, setSystemDark] = useState(false);
+  useEffect(() => {
+    if (theme !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => setSystemDark(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [theme]);
+  if (theme === "dark") return "dark";
+  if (theme === "light") return "light";
+  if (theme === "auto") return systemDark ? "dark" : "light";
+  return "";
 }
 
 export function AIChatWidget({
   apiEndpoint,
   mode = "floating",
+  side = "right",
+  position = "bottom-right",
+  defaultOpen = false,
+  open: openProp,
+  onOpenChange,
   title = "Chat",
+  subtitle,
   greeting = "Hi! How can I help you today?",
   placeholder = "Type a message…",
+  initialPrompts,
+  disclaimer,
+  maxLength = 4000,
+  theme = "inherit",
+  accentColor,
+  className,
   storageKey = "ai-chat-widget:messages",
   persistence = "local",
-  initialPrompts,
-  renderMessageActions,
+  features: featuresProp,
   showStatus = true,
-  accentColor,
-  position = "bottom-right",
-  side = "right",
-  defaultOpen = false,
+  context,
+  headers,
+  body,
+  onSend,
+  onResponse,
+  onError,
+  onFeedback,
+  onClear,
+  renderMessageActions,
 }: AIChatWidgetProps) {
-  const [open, setOpen] = useState(mode === "embedded" || mode === "fullpage" || defaultOpen);
+  const features = { ...DEFAULT_FEATURES, ...featuresProp };
+  const inline = mode === "embedded" || mode === "fullpage";
+  const [openState, setOpenState] = useState(inline || defaultOpen);
+  const open = inline || (openProp ?? openState);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    onOpenChange?.(next);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [draft, setDraft] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
   const [box, setBox] = useState<{ x: number; y: number; width: number; height: number } | null>(
     null,
   );
@@ -149,56 +140,80 @@ export function AIChatWidget({
   const panelRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const busy = status !== "idle";
+  const themeClass = useDarkTheme(theme);
+  const cb = useRef({ context, headers, body, onSend, onResponse, onError });
+  cb.current = { context, headers, body, onSend, onResponse, onError };
 
   useEffect(() => {
     setMessages(loadMessages(getStore(persistence), storageKey, greeting));
   }, [storageKey, persistence, greeting]);
   useEffect(() => {
-    if (!messages.length) return;
+    if (!messages.length || busy) return;
     try {
       getStore(persistence)?.setItem(storageKey, JSON.stringify(messages));
     } catch {
       /* Quota exceeded: current chat still works. */
     }
-  }, [messages, storageKey, persistence]);
+  }, [messages, storageKey, persistence, busy]);
+  useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
-  useEffect(() => {
-    if (!open || (mode !== "floating" && mode !== "sidebar")) return;
+    if (!open || inline) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [mode, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inline, open]);
 
   const run = useCallback(
     async (history: ChatMessage[]) => {
-      const assistant: ChatMessage = { id: uid(), role: "assistant", content: "" };
+      const assistant: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        content: "",
+        createdAt: Date.now(),
+      };
       setMessages([...history, assistant]);
       setStatus("submitted");
       const controller = new AbortController();
       abortRef.current = controller;
+      const patch = (p: Partial<ChatMessage>) =>
+        setMessages((prev) => prev.map((m) => (m.id === assistant.id ? { ...m, ...p } : m)));
+      const { context: ctx, headers: hdrs, body: extra } = cb.current;
+      let sources: ChatMessage["sources"];
       try {
-        const text = await streamChat(
-          apiEndpoint,
-          history,
-          (content) => {
+        const contextValue = resolve(ctx);
+        const text = await streamChat({
+          endpoint: apiEndpoint,
+          messages: history
+            .filter((m) => !m.error && m.content)
+            .map(({ role, content }) => ({ role, content })),
+          headers: resolve(hdrs),
+          body: { ...resolve(extra), ...(contextValue ? { context: contextValue } : {}) },
+          signal: controller.signal,
+          onText: (content) => {
             setStatus("streaming");
-            setMessages((prev) => prev.map((m) => (m.id === assistant.id ? { ...m, content } : m)));
+            patch({ content });
           },
-          controller.signal,
-        );
+          onSources: (s) => {
+            sources = s;
+            patch({ sources: s });
+          },
+        });
         if (!text.trim()) throw new Error("The assistant returned an empty response.");
+        cb.current.onResponse?.({ ...assistant, content: text, sources });
       } catch (error) {
         if (controller.signal.aborted) {
-          setMessages((prev) => prev.filter((m) => m.id !== assistant.id || m.content));
-        } else {
-          const text = error instanceof Error ? error.message : "Couldn't reach the assistant.";
           setMessages((prev) =>
-            prev.map((m) => (m.id === assistant.id ? { ...m, content: text, error: true } : m)),
+            prev
+              .filter((m) => m.id !== assistant.id || m.content)
+              .map((m) => (m.id === assistant.id ? { ...m, stopped: true } : m)),
           );
+        } else {
+          const err = error instanceof Error ? error : new Error("Couldn't reach the assistant.");
+          patch({ content: err.message, error: true });
+          cb.current.onError?.(err);
         }
       } finally {
         setStatus("idle");
@@ -210,30 +225,53 @@ export function AIChatWidget({
 
   const send = useCallback(
     (content: string) => {
-      if (busy || !content.trim()) return;
+      const text = content.trim().slice(0, maxLength);
+      if (busy || !text) return;
       setDraft("");
-      void run([...messages, { id: uid(), role: "user", content: content.trim() }]);
+      const message: ChatMessage = {
+        id: uid(),
+        role: "user",
+        content: text,
+        createdAt: Date.now(),
+      };
+      cb.current.onSend?.(message);
+      void run([...messages, message]);
     },
-    [busy, messages, run],
+    [busy, messages, run, maxLength],
   );
-  const retry = () => {
+  const stop = () => abortRef.current?.abort();
+  const regenerate = () => {
     if (busy) return;
-    const history = messages.at(-1)?.error ? messages.slice(0, -1) : messages;
+    const history = messages.at(-1)?.role === "assistant" ? messages.slice(0, -1) : messages;
     if (history.at(-1)?.role === "user") void run(history);
   };
   const clear = () => {
     abortRef.current?.abort();
-    const fresh: ChatMessage[] = greeting
-      ? [{ id: uid(), role: "assistant", content: greeting }]
-      : [];
+    const fresh = greetingMessage(greeting);
     setMessages(fresh);
     setStatus("idle");
+    onClear?.();
     try {
       getStore(persistence)?.setItem(storageKey, JSON.stringify(fresh));
     } catch {
       /* Browser storage may be unavailable. */
     }
   };
+  const copy = async (m: ChatMessage) => {
+    try {
+      await navigator.clipboard.writeText(m.content);
+      setCopied(m.id);
+      setTimeout(() => setCopied((c) => (c === m.id ? null : c)), 1500);
+    } catch {
+      /* Clipboard blocked. */
+    }
+  };
+  const rate = (m: ChatMessage, value: "up" | "down") => {
+    const next = m.feedback === value ? undefined : value;
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, feedback: next } : x)));
+    if (next) onFeedback?.(m, next);
+  };
+
   const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     if (
       mode !== "floating" ||
@@ -253,12 +291,12 @@ export function AIChatWidget({
         width: rect.width,
         height: rect.height,
       });
-    const stop = () => {
+    const end = () => {
       window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointerup", end);
     };
     window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop, { once: true });
+    window.addEventListener("pointerup", end, { once: true });
   };
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = panelRef.current?.getBoundingClientRect();
@@ -285,29 +323,46 @@ export function AIChatWidget({
           ),
         });
     };
-    const stop = () => {
+    const end = () => {
       window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointerup", end);
     };
     window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop, { once: true });
+    window.addEventListener("pointerup", end, { once: true });
   };
+
   const handleSubmit = ({ text }: PromptInputMessage) => send(text);
   const lastId = messages.at(-1)?.id;
   const hasUserMessage = messages.some((m) => m.role === "user");
+  const accentStyle = accentColor
+    ? ({ "--aichat-accent": accentColor } as React.CSSProperties)
+    : {};
+  const time = (t?: number) =>
+    t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
+
   const panel = (
     <div
       ref={panelRef}
-      className={`aichat-panel aichat-panel--${mode} ${mode === "sidebar" ? `aichat-panel--side-${side}` : ""} ${mode === "floating" && box ? "aichat-panel--positioned" : ""}`}
+      className={[
+        "aichat-panel",
+        `aichat-panel--${mode}`,
+        mode === "sidebar" && `aichat-panel--side-${side}`,
+        mode === "floating" && box && "aichat-panel--positioned",
+        themeClass,
+        themeClass && "aichat-themed",
+        inline && className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{
-        ...(accentColor ? ({ "--aichat-accent": accentColor } as React.CSSProperties) : {}),
+        ...accentStyle,
         ...(mode === "floating" && box
           ? { left: box.x, top: box.y, width: box.width, height: box.height }
           : mode === "sidebar"
             ? { width: sidebarWidth }
             : {}),
       }}
-      role={mode === "floating" || mode === "sidebar" ? "dialog" : "region"}
+      role={inline ? "region" : "dialog"}
       aria-label={title}
     >
       <div
@@ -316,23 +371,26 @@ export function AIChatWidget({
       >
         <div className="aichat-title-wrap">
           <span className="aichat-title">{title}</span>
-          {showStatus && busy && (
-            <span className="aichat-status" aria-live="polite">
-              {status === "submitted" ? "Thinking…" : "Writing…"}
-            </span>
-          )}
+          {subtitle && <span className="aichat-subtitle">{subtitle}</span>}
         </div>
+        {showStatus && busy && (
+          <span className="aichat-status" aria-live="polite">
+            {status === "submitted" ? "Thinking…" : "Writing…"}
+          </span>
+        )}
         <div className="aichat-header-actions">
-          <Button
-            size="icon"
-            variant="ghost"
-            title="Clear conversation"
-            aria-label="Clear conversation"
-            onClick={clear}
-          >
-            <Trash2 size={16} />
-          </Button>
-          {(mode === "floating" || mode === "sidebar") && (
+          {features.clear && (
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Clear conversation"
+              aria-label="Clear conversation"
+              onClick={clear}
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+          {!inline && (
             <Button
               size="icon"
               variant="ghost"
@@ -347,34 +405,96 @@ export function AIChatWidget({
       </div>
       <Conversation className="aichat-conversation">
         <ConversationContent className="aichat-transcript">
-          {messages.map((m) => (
-            <Message key={m.id} from={m.role} className="aichat-message">
-              <MessageContent
-                className={
-                  m.role === "user"
-                    ? "aichat-user-message"
-                    : m.error
-                      ? "aichat-error-message"
-                      : "aichat-assistant-message"
-                }
-              >
-                {m.role === "assistant" && !m.content && busy ? (
-                  <Shimmer>Thinking…</Shimmer>
-                ) : m.content ? (
-                  <MessageResponse>{m.content}</MessageResponse>
-                ) : null}
-                {m.error && m.id === lastId && (
-                  <Button size="sm" variant="outline" onClick={retry} disabled={busy}>
-                    <RotateCcw size={13} /> Retry
-                  </Button>
+          {messages.map((m) => {
+            const streamingThis = busy && m.id === lastId;
+            const done = m.role === "assistant" && !m.error && !streamingThis && m.content;
+            const isGreeting = m.role === "assistant" && m === messages[0] && !m.createdAt;
+            return (
+              <Message key={m.id} from={m.role} className="aichat-message">
+                <MessageContent
+                  className={
+                    m.role === "user"
+                      ? "aichat-user-message"
+                      : m.error
+                        ? "aichat-error-message"
+                        : "aichat-assistant-message"
+                  }
+                >
+                  {m.role === "assistant" && !m.content && busy ? (
+                    <Shimmer>Thinking…</Shimmer>
+                  ) : m.content ? (
+                    <MessageResponse>{m.content}</MessageResponse>
+                  ) : null}
+                  {m.stopped && <span className="aichat-note">Stopped</span>}
+                  {features.sources && m.sources?.length ? (
+                    <ul className="aichat-sources" aria-label="Sources">
+                      {m.sources.map((s, i) => (
+                        <li key={i}>
+                          {s.url ? (
+                            <a href={s.url} target="_blank" rel="noreferrer noopener">
+                              {s.title} <ExternalLink size={11} aria-hidden="true" />
+                            </a>
+                          ) : (
+                            <span>{s.title}</span>
+                          )}
+                          {s.snippet && <p>{s.snippet}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {m.error && m.id === lastId && (
+                    <Button size="sm" variant="outline" onClick={regenerate} disabled={busy}>
+                      <RotateCcw size={13} /> Retry
+                    </Button>
+                  )}
+                </MessageContent>
+                {done && !isGreeting && (
+                  <MessageActions className="aichat-actions">
+                    {features.copy && (
+                      <MessageAction label="Copy reply" title="Copy" onClick={() => copy(m)}>
+                        {copied === m.id ? <Check size={14} /> : <Copy size={14} />}
+                      </MessageAction>
+                    )}
+                    {features.regenerate && m.id === lastId && hasUserMessage && (
+                      <MessageAction
+                        label="Regenerate reply"
+                        title="Regenerate"
+                        onClick={regenerate}
+                      >
+                        <RefreshCw size={14} />
+                      </MessageAction>
+                    )}
+                    {features.feedback && (
+                      <>
+                        <MessageAction
+                          label="Good reply"
+                          title="Good reply"
+                          aria-pressed={m.feedback === "up"}
+                          data-active={m.feedback === "up"}
+                          onClick={() => rate(m, "up")}
+                        >
+                          <ThumbsUp size={14} />
+                        </MessageAction>
+                        <MessageAction
+                          label="Bad reply"
+                          title="Bad reply"
+                          aria-pressed={m.feedback === "down"}
+                          data-active={m.feedback === "down"}
+                          onClick={() => rate(m, "down")}
+                        >
+                          <ThumbsDown size={14} />
+                        </MessageAction>
+                      </>
+                    )}
+                    {renderMessageActions?.(m)}
+                  </MessageActions>
                 )}
-                {m.role === "assistant" &&
-                  !m.error &&
-                  !(busy && m.id === lastId) &&
-                  renderMessageActions?.(m)}
-              </MessageContent>
-            </Message>
-          ))}
+                {features.timestamps && m.createdAt && (
+                  <span className="aichat-time">{time(m.createdAt)}</span>
+                )}
+              </Message>
+            );
+          })}
           {!hasUserMessage && initialPrompts?.length ? (
             <div className="aichat-prompts">
               {initialPrompts.map((p) => (
@@ -401,19 +521,24 @@ export function AIChatWidget({
             autoFocus={mode !== "floating" || open}
             placeholder={placeholder}
             value={draft}
+            maxLength={maxLength}
             onChange={(e) => setDraft(e.target.value)}
             disabled={busy}
             className="aichat-textarea"
           />
           <PromptInputFooter className="aichat-footer">
-            <span />
+            <span className="aichat-count">
+              {draft.length > maxLength * 0.8 ? `${draft.length}/${maxLength}` : ""}
+            </span>
             <PromptInputSubmit
-              status={busy ? "submitted" : "ready"}
-              disabled={busy || !draft.trim()}
-              aria-label="Send message"
+              status={status === "idle" ? "ready" : status}
+              onStop={features.stop ? stop : undefined}
+              disabled={busy ? !features.stop : !draft.trim()}
+              aria-label={busy && features.stop ? "Stop reply" : "Send message"}
             />
           </PromptInputFooter>
         </PromptInput>
+        {disclaimer && <p className="aichat-disclaimer">{disclaimer}</p>}
       </div>
       {mode === "sidebar" && (
         <div
@@ -437,13 +562,13 @@ export function AIChatWidget({
       )}
     </div>
   );
-  if (mode === "embedded" || mode === "fullpage") return panel;
+  if (inline) return panel;
   const launcherSide =
     mode === "sidebar" ? (side === "left" ? "bottom-left" : "bottom-right") : position;
   return (
     <div
-      className={`aichat-root aichat-root--${launcherSide} aichat-root--${mode}`}
-      style={accentColor ? ({ "--aichat-accent": accentColor } as React.CSSProperties) : undefined}
+      className={`aichat-root aichat-root--${launcherSide} aichat-root--${mode} ${className ?? ""}`}
+      style={accentColor ? accentStyle : undefined}
     >
       {open && mode === "sidebar" && (
         <div className="aichat-backdrop" onClick={() => setOpen(false)} />
@@ -452,7 +577,7 @@ export function AIChatWidget({
       <Button
         type="button"
         className="aichat-bubble"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         aria-label={open ? "Close chat" : "Open chat"}
         title={open ? "Close chat" : "Open chat"}
       >
